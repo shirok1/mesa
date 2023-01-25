@@ -33,7 +33,7 @@ key_debug(const struct brw_compiler *c, void *log,
           const char *name, int a, int b)
 {
    if (a != b) {
-      c->shader_perf_log(log, "  %s %d->%d\n", name, a, b);
+      brw_shader_perf_log(c, log, "  %s %d->%d\n", name, a, b);
       return true;
    }
    return false;
@@ -44,7 +44,7 @@ key_debug_float(const struct brw_compiler *c, void *log,
                 const char *name, float a, float b)
 {
    if (a != b) {
-      c->shader_perf_log(log, "  %s %f->%f\n", name, a, b);
+      brw_shader_perf_log(c, log, "  %s %f->%f\n", name, a, b);
       return true;
    }
    return false;
@@ -72,6 +72,9 @@ debug_sampler_recompile(const struct brw_compiler *c, void *log,
    found |= check("xy_uxvx image bound", xy_uxvx_image_mask);
    found |= check("ayuv image bound", ayuv_image_mask);
    found |= check("xyuv image bound", xyuv_image_mask);
+   found |= check("bt709", bt709_mask);
+   found |= check("bt2020", bt2020_mask);
+   found |= check("yuv full range", yuv_full_range_mask);
 
    for (unsigned i = 0; i < MAX_SAMPLERS; i++) {
       found |= check("EXT_texture_swizzle or DEPTH_TEXTURE_MODE", swizzles[i]);
@@ -111,7 +114,7 @@ debug_vs_recompile(const struct brw_compiler *c, void *log,
    found |= check("vertex color clamping", clamp_vertex_color);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -129,7 +132,7 @@ debug_tcs_recompile(const struct brw_compiler *c, void *log,
    found |= check("quads and equal_spacing workaround", quads_workaround);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -144,7 +147,7 @@ debug_tes_recompile(const struct brw_compiler *c, void *log,
    found |= check("patch inputs read", patch_inputs_read);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -156,7 +159,7 @@ debug_gs_recompile(const struct brw_compiler *c, void *log,
    bool found = debug_base_recompile(c, log, &old_key->base, &key->base);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -190,7 +193,7 @@ debug_fs_recompile(const struct brw_compiler *c, void *log,
    found |= debug_base_recompile(c, log, &old_key->base, &key->base);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -202,7 +205,7 @@ debug_cs_recompile(const struct brw_compiler *c, void *log,
    bool found = debug_base_recompile(c, log, &old_key->base, &key->base);
 
    if (!found) {
-      c->shader_perf_log(log, "  something else\n");
+      brw_shader_perf_log(c, log, "  something else\n");
    }
 }
 
@@ -213,7 +216,7 @@ brw_debug_key_recompile(const struct brw_compiler *c, void *log,
                         const struct brw_base_prog_key *key)
 {
    if (!old_key) {
-      c->shader_perf_log(log, "  No previous compile found...\n");
+      brw_shader_perf_log(c, log, "  No previous compile found...\n");
       return;
    }
 

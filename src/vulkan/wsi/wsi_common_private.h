@@ -96,6 +96,7 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
                         const uint64_t *const *modifiers,
                         bool host_visible,
                         int display_fd,
+                        uint8_t *(alloc_shm)(struct wsi_image *image, unsigned size),
                         struct wsi_image *image);
 
 VkResult

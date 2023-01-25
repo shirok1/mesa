@@ -54,6 +54,7 @@ enum _egl_platform_type {
    _EGL_PLATFORM_DEVICE,
    _EGL_PLATFORM_TIZEN,
    _EGL_PLATFORM_NULL,
+   _EGL_PLATFORM_WINDOWS,
 
    _EGL_NUM_PLATFORMS,
    _EGL_INVALID_PLATFORM = -1
@@ -111,6 +112,7 @@ struct _egl_extensions
    EGLBoolean EXT_image_gl_colorspace;
    EGLBoolean EXT_pixel_format_float;
    EGLBoolean EXT_protected_surface;
+   EGLBoolean EXT_present_opaque;
    EGLBoolean EXT_surface_CTA861_3_metadata;
    EGLBoolean EXT_surface_SMPTE2086_metadata;
    EGLBoolean EXT_swap_buffers_with_damage;

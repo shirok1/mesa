@@ -2025,6 +2025,80 @@ instruction_restrictions(const struct intel_device_info *devinfo,
       }
    }
 
+   if (brw_inst_opcode(devinfo, inst) == BRW_OPCODE_MATH) {
+      unsigned math_function = brw_inst_math_function(devinfo, inst);
+      switch (math_function) {
+      case BRW_MATH_FUNCTION_INT_DIV_QUOTIENT_AND_REMAINDER:
+      case BRW_MATH_FUNCTION_INT_DIV_QUOTIENT:
+      case BRW_MATH_FUNCTION_INT_DIV_REMAINDER: {
+         /* Page 442 of the Broadwell PRM Volume 2a "Extended Math Function" says:
+          *    INT DIV function does not support source modifiers.
+          * Bspec 6647 extends it back to Ivy Bridge.
+          */
+         bool src0_valid = !brw_inst_src0_negate(devinfo, inst) &&
+                           !brw_inst_src0_abs(devinfo, inst);
+         bool src1_valid = !brw_inst_src1_negate(devinfo, inst) &&
+                           !brw_inst_src1_abs(devinfo, inst);
+         ERROR_IF(!src0_valid || !src1_valid,
+                  "INT DIV function does not support source modifiers.");
+         break;
+      }
+      default:
+         break;
+      }
+   }
+
+   if (brw_inst_opcode(devinfo, inst) == BRW_OPCODE_DP4A) {
+      /* Page 396 (page 412 of the PDF) of the DG1 PRM volume 2a says:
+       *
+       *    Only one of src0 or src1 operand may be an the (sic) accumulator
+       *    register (acc#).
+       */
+      ERROR_IF(src0_is_acc(devinfo, inst) && src1_is_acc(devinfo, inst),
+               "Only one of src0 or src1 operand may be an accumulator "
+               "register (acc#).");
+
+   }
+
+   return error_msg;
+}
+
+static struct string
+send_descriptor_restrictions(const struct intel_device_info *devinfo,
+                             const brw_inst *inst)
+{
+   struct string error_msg = { .str = NULL, .len = 0 };
+
+   if (inst_is_split_send(devinfo, inst)) {
+      /* We can only validate immediate descriptors */
+      if (brw_inst_send_sel_reg32_desc(devinfo, inst))
+         return error_msg;
+   } else if (inst_is_send(devinfo, inst)) {
+      /* We can only validate immediate descriptors */
+      if (brw_inst_src1_reg_file(devinfo, inst) != BRW_IMMEDIATE_VALUE)
+         return error_msg;
+   } else {
+      return error_msg;
+   }
+
+   const uint32_t desc = brw_inst_send_desc(devinfo, inst);
+
+   switch (brw_inst_sfid(devinfo, inst)) {
+   case GFX12_SFID_TGM:
+   case GFX12_SFID_SLM:
+   case GFX12_SFID_UGM:
+      ERROR_IF(!devinfo->has_lsc, "Platform does not support LSC");
+
+      ERROR_IF(lsc_opcode_has_transpose(lsc_msg_desc_opcode(devinfo, desc)) &&
+               lsc_msg_desc_transpose(devinfo, desc) &&
+               brw_inst_exec_size(devinfo, inst) != BRW_EXECUTE_1,
+               "Transposed vectors are restricted to Exec_Mask = 1.");
+      break;
+
+   default:
+      break;
+   }
+
    return error_msg;
 }
 
@@ -2051,6 +2125,7 @@ brw_validate_instruction(const struct intel_device_info *devinfo,
          CHECK(vector_immediate_restrictions);
          CHECK(special_requirements_for_handling_double_precision_data_types);
          CHECK(instruction_restrictions);
+         CHECK(send_descriptor_restrictions);
       }
    }
 

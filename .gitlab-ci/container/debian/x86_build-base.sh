@@ -58,13 +58,11 @@ apt-get install -y --no-remove \
         make \
         meson \
         pkg-config \
-        python-is-python3 \
         python3-mako \
         python3-pil \
         python3-requests \
         qemu-user \
         valgrind \
-        wayland-protocols \
         wget \
         wine64 \
         x11proto-dri2-dev \
@@ -74,7 +72,7 @@ apt-get install -y --no-remove \
         zlib1g-dev
 
 # Needed for ci-fairy, this revision is able to upload files to MinIO
-pip3 install git+http://gitlab.freedesktop.org/freedesktop/ci-templates@6f5af7e5574509726c79109e3c147cee95e81366
+pip3 install git+http://gitlab.freedesktop.org/freedesktop/ci-templates@ffe4d1b10aab7534489f0c4bbc4c5899df17d3f2
 
 ############### Uninstall ephemeral packages
 

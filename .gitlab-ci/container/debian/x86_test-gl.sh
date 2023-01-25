@@ -12,7 +12,6 @@ STABLE_EPHEMERAL=" \
       bc \
       bison \
       bzip2 \
-      cargo \
       ccache \
       clang-11 \
       cmake \
@@ -23,6 +22,7 @@ STABLE_EPHEMERAL=" \
       libcap-dev \
       libclang-cpp11-dev \
       libelf-dev \
+      libexpat1-dev \
       libfdt-dev \
       libgbm-dev \
       libgles2-mesa-dev \
@@ -32,7 +32,6 @@ STABLE_EPHEMERAL=" \
       libudev-dev \
       libvulkan-dev \
       libwaffle-dev \
-      libwayland-dev \
       libx11-xcb-dev \
       libxcb-dri2-0-dev \
       libxext-dev \
@@ -46,7 +45,6 @@ STABLE_EPHEMERAL=" \
       patch \
       pkg-config \
       python3-distutils \
-      wayland-protocols \
       wget \
       xz-utils \
       "
@@ -87,6 +85,10 @@ mkdir -p /lava-files/
 
 . .gitlab-ci/container/build-libdrm.sh
 
+############### Build Wayland
+
+. .gitlab-ci/container/build-wayland.sh
+
 ############### Build libclc
 
 . .gitlab-ci/container/build-libclc.sh
@@ -101,6 +103,7 @@ PIGLIT_OPTS="-DPIGLIT_BUILD_CL_TESTS=ON -DPIGLIT_BUILD_DMA_BUF_TESTS=ON" . .gitl
 
 ############### Build Crosvm
 
+. .gitlab-ci/container/build-rust.sh
 . .gitlab-ci/container/build-crosvm.sh
 rm -rf /root/.cargo
 

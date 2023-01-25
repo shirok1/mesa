@@ -3,7 +3,7 @@
 set -ex
 
 INSTALL=$(realpath -s "$PWD"/install)
-MINIO_ARGS="--credentials=/tmp/.minio_credentials"
+MINIO_ARGS="--credentials=/tmp/.minio_credentials --token-file=${CI_JOB_JWT_FILE}"
 
 RESULTS=$(realpath -s "$PWD"/results)
 mkdir -p "$RESULTS"
@@ -107,7 +107,7 @@ else
 
             LD_LIBRARY_PATH="$__LD_LIBRARY_PATH" \
             GALLIUM_DRIVER=llvmpipe \
-            GALLIVM_PERF="nopt,no_filter_hacks" \
+            GALLIVM_PERF="nopt" \
             VTEST_USE_EGL_SURFACELESS=1 \
             VTEST_USE_GLES=1 \
             virgl_test_server >"$RESULTS"/vtest-log.txt 2>&1 &
@@ -160,22 +160,10 @@ replay_minio_upload_images() {
         else
             __MINIO_PATH="$JOB_ARTIFACTS_BASE"
             __DESTINATION_FILE_PATH="$__MINIO_TRACES_PREFIX/${line##*-}"
-            # Adding to the JUnit the direct link to the diff page in
-            # the dashboard
-            __PIGLIT_TESTCASE_CLASSNAME="piglit\.trace\.$PIGLIT_REPLAY_DEVICE_NAME\.$(dirname $__TRACE | sed 's%/%\\.%g;s@%@\\%@')"
-            __PIGLIT_TESTCASE_NAME="$(basename $__TRACE | sed 's%\.%_%g;s@%@\\%@')"
-            __DASHBOARD_URL="https://tracie.freedesktop.org/dashboard/imagediff/${CI_PROJECT_PATH}/${CI_JOB_ID}/${__TRACE}"
-            __START_TEST_PATTERN='<testcase classname="'"${__PIGLIT_TESTCASE_CLASSNAME}"'" name="'"${__PIGLIT_TESTCASE_NAME}"'" status="fail"'
-            __REPLACE_TEST_PATTERN='</system-out><failure type="fail"/></testcase>'
-            # Replace in the range between __START_TEST_PATTERN and
-            # __REPLACE_TEST_PATTERN leaving __START_TEST_PATTERN out
-            # from the substitution
-            sed '\%'"${__START_TEST_PATTERN}"'%,\%'"${__REPLACE_TEST_PATTERN}"'%{\%'"${__START_TEST_PATTERN}"'%b;s%'"${__REPLACE_TEST_PATTERN}"'%</system-out><failure type="fail">To view the image differences visit: '"${__DASHBOARD_URL}"'</failure></testcase>%}' \
-                -i "$RESULTS"/junit.xml
         fi
 
-        ci-fairy minio cp $MINIO_ARGS "$RESULTS/$__PREFIX/$line" \
-            "minio://${__MINIO_PATH}/${__DESTINATION_FILE_PATH}"
+        ci-fairy s3cp $MINIO_ARGS "$RESULTS/$__PREFIX/$line" \
+            "https://${__MINIO_PATH}/${__DESTINATION_FILE_PATH}"
     done
 }
 
@@ -236,8 +224,6 @@ mkdir -p .gitlab-ci/piglit
 
 if [ "x$PIGLIT_PROFILES" = "xreplay" ] \
        && [ ${PIGLIT_REPLAY_UPLOAD_TO_MINIO:-0} -eq 1 ]; then
-
-    ci-fairy minio login $MINIO_ARGS $CI_JOB_JWT
 
     __PREFIX="trace/$PIGLIT_REPLAY_DEVICE_NAME"
     __MINIO_PATH="$PIGLIT_REPLAY_ARTIFACTS_BASE_URL"

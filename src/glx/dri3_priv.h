@@ -109,6 +109,7 @@ struct dri3_screen {
    int fd;
    int fd_dpy;
    bool is_different_gpu;
+   bool prefer_back_buffer_reuse;
 
    /* fd for display GPU in case of prime */
    int fd_display_gpu;

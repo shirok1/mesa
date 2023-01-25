@@ -1010,6 +1010,7 @@ struct gl_texture_object
    bool StencilSampling;       /**< Should we sample stencil instead of depth? */
 
    /** GL_OES_EGL_image_external */
+   GLboolean External;
    GLubyte RequiredTextureImageUnits;
 
    /** GL_EXT_memory_object */
@@ -2152,8 +2153,6 @@ struct gl_program
    void *driver_cache_blob;
    size_t driver_cache_blob_size;
 
-   bool is_arb_asm; /** Is this an ARB assembly-style program */
-
    /** Is this program written to on disk shader cache */
    bool program_written_to_cache;
 
@@ -2273,15 +2272,6 @@ struct gl_program
          GLuint NumBindlessImages;
          GLboolean HasBoundBindlessImage;
          struct gl_bindless_image *BindlessImages;
-
-         union {
-            struct {
-               /**
-                * A bitmask of gl_advanced_blend_mode values
-                */
-               GLbitfield BlendSupport;
-            } fs;
-         };
       } sh;
 
       /** ARB assembly-style program fields */
@@ -3319,6 +3309,9 @@ struct gl_shader_compiler_options
    /** (driconf) Force gl_Position to be considered invariant */
    GLboolean PositionAlwaysInvariant;
 
+   /** (driconf) Force gl_Position to be considered precise */
+   GLboolean PositionAlwaysPrecise;
+
    const struct nir_shader_compiler_options *NirOptions;
 };
 
@@ -3463,7 +3456,7 @@ struct gl_shared_state
    /* glCompileShaderInclude expects ShaderIncludes not to change while it is
     * in progress.
     */
-   mtx_t ShaderIncludeMutex;
+   simple_mtx_t ShaderIncludeMutex;
 
    /**
     * Some context in this share group was affected by a GPU reset
@@ -4317,6 +4310,7 @@ struct gl_constants
    struct spirv_supported_extensions *SpirVExtensions;
 
    char *VendorOverride;
+   char *RendererOverride;
 
    /** Buffer size used to upload vertices from glBegin/glEnd. */
    unsigned glBeginEndBufferSize;
@@ -4814,8 +4808,9 @@ struct gl_driver_flags
 
    /**
     * gl_context::TessCtrlProgram::patch_default_*
+    * gl_context::TessCtrlProgram::patch_vertices
     */
-   uint64_t NewDefaultTessLevels;
+   uint64_t NewTessState;
 
    /**
     * gl_context::IntelConservativeRasterization
@@ -5142,7 +5137,7 @@ struct gl_texture_attrib_node
    /* For saving per texture object state (wrap modes, filters, etc),
     * SavedObj[][].Target is unused, so the value is invalid.
     */
-   struct gl_texture_object SavedObj[MAX_TEXTURE_UNITS][NUM_TEXTURE_TARGETS];
+   struct gl_texture_object SavedObj[MAX_COMBINED_TEXTURE_IMAGE_UNITS][NUM_TEXTURE_TARGETS];
 };
 
 

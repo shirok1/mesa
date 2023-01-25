@@ -43,7 +43,6 @@ apt-get -y install \
 	llvm-11-dev \
 	meson \
 	pkg-config \
-	python-is-python3 \
 	python3-mako \
 	python3-pil \
 	python3-pip \
@@ -58,7 +57,7 @@ apt-get -y install \
 apt-get install -y --no-remove -t buster \
         android-sdk-ext4-utils
 
-pip3 install git+http://gitlab.freedesktop.org/freedesktop/ci-templates@6f5af7e5574509726c79109e3c147cee95e81366
+pip3 install git+http://gitlab.freedesktop.org/freedesktop/ci-templates@ffe4d1b10aab7534489f0c4bbc4c5899df17d3f2
 
 arch=armhf
 . .gitlab-ci/container/cross_build.sh

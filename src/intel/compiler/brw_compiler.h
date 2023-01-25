@@ -69,8 +69,8 @@ struct brw_compiler {
       struct ra_class *aligned_bary_class;
    } fs_reg_sets[3];
 
-   void (*shader_debug_log)(void *, const char *str, ...) PRINTFLIKE(2, 3);
-   void (*shader_perf_log)(void *, const char *str, ...) PRINTFLIKE(2, 3);
+   void (*shader_debug_log)(void *, unsigned *id, const char *str, ...) PRINTFLIKE(3, 4);
+   void (*shader_perf_log)(void *, unsigned *id, const char *str, ...) PRINTFLIKE(3, 4);
 
    bool scalar_stage[MESA_ALL_SHADER_STAGES];
    bool use_tcs_8_patch;
@@ -120,6 +120,16 @@ struct brw_compiler {
     */
    bool indirect_ubos_use_sampler;
 };
+
+#define brw_shader_debug_log(compiler, data, fmt, ... ) do {    \
+   static unsigned id = 0;                                      \
+   compiler->shader_debug_log(data, &id, fmt, ##__VA_ARGS__);   \
+} while (0)
+
+#define brw_shader_perf_log(compiler, data, fmt, ... ) do {     \
+   static unsigned id = 0;                                      \
+   compiler->shader_perf_log(data, &id, fmt, ##__VA_ARGS__);    \
+} while (0)
 
 /**
  * We use a constant subgroup size of 32.  It really only needs to be a
@@ -207,6 +217,7 @@ struct brw_sampler_prog_key_data {
    uint32_t xyuv_image_mask;
    uint32_t bt709_mask;
    uint32_t bt2020_mask;
+   uint32_t yuv_full_range_mask;
 
    /* Scale factor for each texture. */
    float scale_factors[32];
@@ -1663,6 +1674,9 @@ struct brw_compile_cs_params {
    void *log_data;
 
    char *error_str;
+
+   /* If unset, DEBUG_CS is used. */
+   uint64_t debug_flag;
 };
 
 /**

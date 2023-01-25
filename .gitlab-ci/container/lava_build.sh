@@ -17,6 +17,16 @@ check_minio()
 check_minio "${FDO_UPSTREAM_REPO}"
 check_minio "${CI_PROJECT_PATH}"
 
+# This script is arguably the longest one when if it comes to this line
+# Let's make some sanity checks, before failing miserably after waiting a long time
+ci-fairy s3cp --help >/dev/null 2>&1 ||
+    (
+        ERRCODE=$?
+        set +x
+        echo "ci-fairy must have s3cp support. Please update ci-templates package."
+        exit $ERRCODE
+    )
+
 . .gitlab-ci/container/container_pre_build.sh
 
 # Install rust, which we'll be using for deqp-runner.  It will be cleaned up at the end.
@@ -27,19 +37,22 @@ if [[ "$DEBIAN_ARCH" = "arm64" ]]; then
     KERNEL_ARCH="arm64"
     DEFCONFIG="arch/arm64/configs/defconfig"
     DEVICE_TREES="arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dtb"
-    DEVICE_TREES+=" arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dtb"
+    DEVICE_TREES+=" arch/arm64/boot/dts/amlogic/meson-gxl-s805x-libretech-ac.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/allwinner/sun50i-h6-pine-h64.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/qcom/apq8016-sbc.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/qcom/apq8096-db820c.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/amlogic/meson-g12b-a311d-khadas-vim3.dtb"
     DEVICE_TREES+=" arch/arm64/boot/dts/mediatek/mt8183-kukui-jacuzzi-juniper-sku16.dtb"
+    DEVICE_TREES+=" arch/arm64/boot/dts/qcom/sc7180-trogdor-lazor-limozeen-nots.dtb"
     KERNEL_IMAGE_NAME="Image"
 elif [[ "$DEBIAN_ARCH" = "armhf" ]]; then
     GCC_ARCH="arm-linux-gnueabihf"
     KERNEL_ARCH="arm"
     DEFCONFIG="arch/arm/configs/multi_v7_defconfig"
-    DEVICE_TREES="arch/arm/boot/dts/rk3288-veyron-jaq.dtb arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dtb"
+    DEVICE_TREES="arch/arm/boot/dts/rk3288-veyron-jaq.dtb"
+    DEVICE_TREES+=" arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dtb"
+    DEVICE_TREES+=" arch/arm/boot/dts/imx6q-cubox-i.dtb"
     KERNEL_IMAGE_NAME="zImage"
     . .gitlab-ci/container/create-cross-file.sh armhf
 else
@@ -48,6 +61,7 @@ else
     DEFCONFIG="arch/x86/configs/x86_64_defconfig"
     DEVICE_TREES=""
     KERNEL_IMAGE_NAME="bzImage"
+    ARCH_PACKAGES="libva-dev"
 fi
 
 # Determine if we're in a cross build.
@@ -69,6 +83,7 @@ fi
 
 apt-get update
 apt-get install -y --no-remove \
+                   ${ARCH_PACKAGES} \
                    automake \
                    bc \
                    cmake \
@@ -127,8 +142,7 @@ rm -rf /apitrace
 ############### Build dEQP runner
 . .gitlab-ci/container/build-deqp-runner.sh
 mkdir -p /lava-files/rootfs-${DEBIAN_ARCH}/usr/bin
-mv /usr/local/bin/deqp-runner /lava-files/rootfs-${DEBIAN_ARCH}/usr/bin/.
-mv /usr/local/bin/piglit-runner /lava-files/rootfs-${DEBIAN_ARCH}/usr/bin/.
+mv /usr/local/bin/*-runner /lava-files/rootfs-${DEBIAN_ARCH}/usr/bin/.
 
 
 ############### Build dEQP
@@ -141,6 +155,11 @@ mv /deqp /lava-files/rootfs-${DEBIAN_ARCH}/.
 PIGLIT_OPTS="-DPIGLIT_BUILD_DMA_BUF_TESTS=ON" . .gitlab-ci/container/build-piglit.sh
 mv /piglit /lava-files/rootfs-${DEBIAN_ARCH}/.
 
+############### Build libva tests
+if [[ "$DEBIAN_ARCH" = "amd64" ]]; then
+    . .gitlab-ci/container/build-va-tools.sh
+    mv /va/bin/* /lava-files/rootfs-${DEBIAN_ARCH}/usr/bin/
+fi
 
 ############### Build libdrm
 EXTRA_MESON_ARGS+=" -D prefix=/libdrm"
@@ -177,6 +196,8 @@ rm /lava-files/rootfs-${DEBIAN_ARCH}/create-rootfs.sh
 # created.
 mkdir -p /lava-files/rootfs-${DEBIAN_ARCH}/usr/lib/$GCC_ARCH
 find /libdrm/ -name lib\*\.so\* | xargs cp -t /lava-files/rootfs-${DEBIAN_ARCH}/usr/lib/$GCC_ARCH/.
+mkdir -p /lava-files/rootfs-${DEBIAN_ARCH}/libdrm/
+cp -Rp /libdrm/share /lava-files/rootfs-${DEBIAN_ARCH}/libdrm/share
 rm -rf /libdrm
 
 
@@ -194,7 +215,6 @@ popd
 . .gitlab-ci/container/container_post_build.sh
 
 ############### Upload the files!
-ci-fairy minio login $CI_JOB_JWT
 FILES_TO_UPLOAD="lava-rootfs.tgz \
                  $KERNEL_IMAGE_NAME"
 
@@ -203,9 +223,9 @@ if [[ -n $DEVICE_TREES ]]; then
 fi
 
 for f in $FILES_TO_UPLOAD; do
-    ci-fairy minio cp /lava-files/$f \
-             minio://${MINIO_PATH}/$f
+    ci-fairy s3cp --token-file "${CI_JOB_JWT_FILE}" /lava-files/$f \
+             https://${MINIO_PATH}/$f
 done
 
 touch /lava-files/done
-ci-fairy minio cp /lava-files/done minio://${MINIO_PATH}/done
+ci-fairy s3cp --token-file "${CI_JOB_JWT_FILE}" /lava-files/done https://${MINIO_PATH}/done

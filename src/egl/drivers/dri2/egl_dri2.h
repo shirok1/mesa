@@ -99,7 +99,7 @@ struct zwp_linux_dmabuf_v1;
 #include "util/u_vector.h"
 #include "util/bitset.h"
 
-#define EGL_DRI2_MAX_FORMATS 10
+#define EGL_DRI2_MAX_FORMATS 14
 
 struct wl_buffer;
 
@@ -384,7 +384,11 @@ struct dri2_egl_surface
 #endif
 
 #if defined(HAVE_WAYLAND_PLATFORM) || defined(HAVE_NULL_PLATFORM)
-   int			  format;
+   int                    format;
+#endif
+
+#ifdef HAVE_WAYLAND_PLATFORM
+   bool                   resized;
 #endif
 
 #ifdef HAVE_DRM_PLATFORM
@@ -558,6 +562,12 @@ dri2_setup_extensions(_EGLDisplay *disp);
 
 __DRIdrawable *
 dri2_surface_get_dri_drawable(_EGLSurface *surf);
+
+GLboolean
+dri2_validate_egl_image(void *image, void *data);
+
+__DRIimage *
+dri2_lookup_egl_image_validated(void *image, void *data);
 
 __DRIimage *
 dri2_lookup_egl_image(__DRIscreen *screen, void *image, void *data);

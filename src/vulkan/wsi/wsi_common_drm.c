@@ -118,6 +118,7 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
                         const uint64_t *const *modifiers,
                         bool host_visible,
                         int display_fd,
+                        uint8_t *(alloc_shm)(struct wsi_image *image, unsigned size),
                         struct wsi_image *image)
 {
    const struct wsi_device *wsi = chain->wsi;
@@ -130,9 +131,15 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
    struct wsi_image_create_info image_wsi_info = {
       .sType = VK_STRUCTURE_TYPE_WSI_IMAGE_CREATE_INFO_MESA,
    };
+   VkExternalMemoryImageCreateInfo ext_mem_image_create_info = {
+      .sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
+      .pNext = &image_wsi_info,
+      .handleTypes = wsi->sw ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT :
+      VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+   };
    VkImageCreateInfo image_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-      .pNext = &image_wsi_info,
+      .pNext = &ext_mem_image_create_info,
       .flags = 0,
       .imageType = VK_IMAGE_TYPE_2D,
       .format = pCreateInfo->imageFormat,
@@ -314,6 +321,19 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
    VkMemoryRequirements reqs;
    wsi->GetImageMemoryRequirements(chain->device, image->image, &reqs);
 
+   void *sw_host_ptr = NULL;
+   if (alloc_shm) {
+      VkSubresourceLayout layout;
+
+      wsi->GetImageSubresourceLayout(chain->device, image->image,
+                                     &(VkImageSubresource) {
+                                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                                        .mipLevel = 0,
+                                        .arrayLayer = 0,
+                                     }, &layout);
+      sw_host_ptr = (*alloc_shm)(image, layout.size);
+   }
+
    const struct wsi_memory_allocate_info memory_wsi_info = {
       .sType = VK_STRUCTURE_TYPE_WSI_MEMORY_ALLOCATE_INFO_MESA,
       .pNext = NULL,
@@ -327,7 +347,8 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
    const VkExportMemoryAllocateInfo memory_export_info = {
       .sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
       .pNext = &memory_wsi_info2,
-      .handleTypes = VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
+      .handleTypes = wsi->sw ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT :
+      VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT,
    };
    const VkMemoryDedicatedAllocateInfo memory_dedicated_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
@@ -335,9 +356,15 @@ wsi_create_native_image(const struct wsi_swapchain *chain,
       .image = image->image,
       .buffer = VK_NULL_HANDLE,
    };
+   const VkImportMemoryHostPointerInfoEXT host_ptr_info = {
+      .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
+      .pNext = &memory_dedicated_info,
+      .pHostPointer = sw_host_ptr,
+      .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+   };
    const VkMemoryAllocateInfo memory_info = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-      .pNext = &memory_dedicated_info,
+      .pNext = sw_host_ptr ? (void *)&host_ptr_info : (void *)&memory_dedicated_info,
       .allocationSize = reqs.size,
       .memoryTypeIndex = select_memory_type(wsi, true, host_visible,
                                             reqs.memoryTypeBits),
@@ -532,9 +559,9 @@ wsi_create_prime_image(const struct wsi_swapchain *chain,
 
    const struct wsi_image_create_info image_wsi_info = {
       .sType = VK_STRUCTURE_TYPE_WSI_IMAGE_CREATE_INFO_MESA,
-      .prime_blit_buffer = image->prime.buffer,
+      .prime_blit_src = true,
    };
-   const VkImageCreateInfo image_info = {
+   VkImageCreateInfo image_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext = &image_wsi_info,
       .flags = 0,
@@ -555,6 +582,10 @@ wsi_create_prime_image(const struct wsi_swapchain *chain,
       .pQueueFamilyIndices = pCreateInfo->pQueueFamilyIndices,
       .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
    };
+   if (pCreateInfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR) {
+      image_info.flags |= VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT |
+                          VK_IMAGE_CREATE_EXTENDED_USAGE_BIT_KHR;
+   }
    result = wsi->CreateImage(chain->device, &image_info,
                              &chain->alloc, &image->image);
    if (result != VK_SUCCESS)
