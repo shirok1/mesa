@@ -34,8 +34,6 @@ if with_platform_wayland
   pvr_wsi_args += '-DVK_USE_PLATFORM_WAYLAND_KHR'
 
   pvr_wsi_depends += dep_wayland_client
-
-  pvr_wsi_src += 'pvr_wsi_wayland.c'
 endif
 
 if with_platform_x11
@@ -45,14 +43,10 @@ if with_platform_x11
   ]
 
   pvr_wsi_depends += dep_xcb_dri2
-
-  pvr_wsi_src += 'pvr_wsi_x11.c'
 endif
 
 if system_has_kms_drm and not with_platform_android
   pvr_wsi_args += '-DVK_USE_PLATFORM_DISPLAY_KHR'
-
-  pvr_wsi_src += 'pvr_wsi_display.c'
 endif
 
 if with_xlib_lease
