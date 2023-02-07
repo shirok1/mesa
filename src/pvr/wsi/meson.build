@@ -20,13 +20,12 @@
 
 pvr_wsi_args = vulkan_wsi_args
 
-pvr_wsi_depends = [ dep_libdrm, idep_vulkan_util, idep_xmlconfig ]
+pvr_wsi_depends = [ dep_libdrm, idep_vulkan_util, idep_vulkan_wsi, idep_xmlconfig ]
 
 pvr_wsi_includes = [
   inc_include,
   inc_src,
-  inc_vulkan_util,
-  inc_vulkan_wsi
+  inc_vulkan_util
 ]
 
 pvr_wsi_src = [ 'pvr_wsi.c' ]
