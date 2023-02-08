@@ -244,12 +244,16 @@ _eglQueryDeviceAttribEXT(_EGLDevice *dev, EGLint attribute,
 const char *
 _eglQueryDeviceStringEXT(_EGLDevice *dev, EGLint name)
 {
+   char *err_msg = NULL;
    switch (name) {
    case EGL_EXTENSIONS:
       return dev->extensions;
    case EGL_DRM_DEVICE_FILE_EXT:
-      if (!_eglDeviceSupports(dev, _EGL_DEVICE_DRM))
+      if (!_eglDeviceSupports(dev, _EGL_DEVICE_DRM)) {
+         err_msg = "You asked for `EGL_DRM_DEVICE_FILE_EXT`, but the device "
+                   "doesn't support `EGL_EXT_device_drm`!";
          break;
+      }
 #ifdef HAVE_LIBDRM
       return dev->device->nodes[DRM_NODE_PRIMARY];
 #else
@@ -260,8 +264,11 @@ _eglQueryDeviceStringEXT(_EGLDevice *dev, EGLint name)
       break;
 #endif
    case EGL_DRM_RENDER_NODE_FILE_EXT:
-      if (!_eglDeviceSupports(dev, _EGL_DEVICE_DRM_RENDER_NODE))
+      if (!_eglDeviceSupports(dev, _EGL_DEVICE_DRM_RENDER_NODE)) {
+         err_msg = "You asked for `EGL_DRM_RENDER_NODE_FILE_EXT`, but the device "
+                   "doesn't support `EGL_EXT_device_drm_render_node`!";
          break;
+      }
 #ifdef HAVE_LIBDRM
       return dev->device ? dev->device->nodes[DRM_NODE_RENDER] : NULL;
 #else
@@ -270,7 +277,13 @@ _eglQueryDeviceStringEXT(_EGLDevice *dev, EGLint name)
       return NULL;
 #endif
    }
-   _eglError(EGL_BAD_PARAMETER, "eglQueryDeviceStringEXT");
+   if (err_msg) {
+      _eglError(EGL_BAD_PARAMETER, err_msg);
+   } else {
+      static char buf[64];
+      snprintf(buf, sizeof(buf), "eglQueryDeviceStringEXT in Mesa don't support `name` 0x%x!", name);
+      _eglError(EGL_BAD_PARAMETER, buf);
+   }
    return NULL;
 }
 
